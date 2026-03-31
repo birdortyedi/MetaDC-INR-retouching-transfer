@@ -4,10 +4,16 @@
 
 🏆 **Winner of the NTIRE 2026 Photography Retouching Transfer Challenge**
 
+![MetaDC-INR Architecture](data/arch.png)
+
 MetaDC-INR is a hybrid INR + CNN framework for deterministic photo retouching transfer.  
 It disentangles contextual style descriptors from spatially-continuous structural adjustments by combining a dual-branch feature extractor with a FiLM-modulated implicit neural representation (INR), trained via the Reptile meta-learning algorithm for rapid test-time adaptation.
 
 For the full technical description, see [`TECHNICAL_REPORT.md`](TECHNICAL_REPORT.md).
+
+| Reference Before | Reference After | Input Image | Our Result |
+| :---: | :---: | :---: | :---: |
+| ![Ref Before](data/eval/sample107/sample107_before.jpg) | ![Ref After](data/eval/sample107/sample107_after.jpg) | ![Input](data/eval/sample107/sample107_input.jpg) | ![Result](results/sample107_retouched.png) |
 
 ---
 
