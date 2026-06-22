@@ -116,11 +116,9 @@ def main(args):
     
     if args.num_samples > 0:
         pairs = pairs[:args.num_samples]
-    # Default is 0, which means all pairs
         
     if args.num_presets > 0:
         presets = presets[:args.num_presets]
-    # Default is 0, which means all presets
         
     steps_to_test = [10, 100, 500]
     results_summary = []
@@ -200,11 +198,11 @@ if __name__ == '__main__':
     parser.add_argument('--meta_weights', type=str, default='weights/meta_model_ft.pth')
     parser.add_argument('--steps', type=int, default=500)
     parser.add_argument('--gpu', type=int, default=0)
-    parser.add_argument('--num_samples', type=int, default=0, help='Number of samples (0=all)')
-    parser.add_argument('--num_presets', type=int, default=0, help='Number of presets (0=all)')
-    parser.add_argument('--skip_accuracy', action='store_true', help='Only profile complexity')
-    parser.add_argument('--batch_size', type=int, default=512, help='Batch size')
-    parser.add_argument('--window_size', type=int, default=13, help='Window size')
-    parser.add_argument('--hidden_dim', type=int, default=128, help='Hidden dimension')
+    parser.add_argument('--num_samples', type=int, default=0)
+    parser.add_argument('--num_presets', type=int, default=0)
+    parser.add_argument('--skip_accuracy', action='store_true')
+    parser.add_argument('--batch_size', type=int, default=512)
+    parser.add_argument('--window_size', type=int, default=13)
+    parser.add_argument('--hidden_dim', type=int, default=128)
     args = parser.parse_args()
     main(args)

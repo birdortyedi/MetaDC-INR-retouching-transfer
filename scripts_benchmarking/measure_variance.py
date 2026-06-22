@@ -96,8 +96,8 @@ def run_tto_task(task, model_path, device, seed, batch_size=484, window_size=13,
                     pred_10 = nn.functional.interpolate(pred_10, size=gt_tensor.shape[2:], mode='bilinear', align_corners=False)
                 
                 metrics[10] = {
-                    'psnr': calculate_psnr(pred_10, gt_tensor),
-                    'ssim': calculate_ssim(pred_10, gt_tensor),
+                    'psnr': float(calculate_psnr(pred_10, gt_tensor)),
+                    'ssim': float(calculate_ssim(pred_10, gt_tensor)),
                     'pred_tensor': pred_10.cpu() # saved temporarily to compute LPIPS on GPU or CPU later
                 }
 
@@ -155,8 +155,8 @@ def run_tto_task(task, model_path, device, seed, batch_size=484, window_size=13,
             pred_100 = nn.functional.interpolate(pred_100, size=gt_tensor.shape[2:], mode='bilinear', align_corners=False)
 
         metrics[100] = {
-            'psnr': calculate_psnr(pred_100, gt_tensor),
-            'ssim': calculate_ssim(pred_100, gt_tensor),
+            'psnr': float(calculate_psnr(pred_100, gt_tensor)),
+            'ssim': float(calculate_ssim(pred_100, gt_tensor)),
             'pred_tensor': pred_100.cpu()
         }
 
@@ -190,18 +190,6 @@ def main(args):
             print(f"Failed to load progress file: {e}. Starting fresh.")
 
     # We iterate over tasks first, then seeds, so we can save incrementally per task.
-    # To keep things clean, the progress dictionary structure is:
-    # {
-    #   "task_idx": {
-    #      "preset": "Preset_X",
-    #      "image_name": "...",
-    #      "seeds": {
-    #         "42": {"10": {"psnr": ..., "ssim": ..., "lpips": ...}, "100": {...}},
-    #         ...
-    #      }
-    #   }
-    # }
-
     for idx in range(len(dataset)):
         task = dataset[idx]
         task_key = str(idx)
@@ -234,43 +222,30 @@ def main(args):
                 # Compute LPIPS on GPU
                 gt_gpu = gt_cpu.to(device)
                 
-                lpips_10 = loss_fn_alex(metrics[10]['pred_tensor'].to(device) * 2 - 1, gt_gpu * 2 - 1).item()
-                lpips_100 = loss_fn_alex(metrics[100]['pred_tensor'].to(device) * 2 - 1, gt_gpu * 2 - 1).item()
+                lpips_10 = float(loss_fn_alex(metrics[10]['pred_tensor'].to(device) * 2 - 1, gt_gpu * 2 - 1).item())
+                lpips_100 = float(loss_fn_alex(metrics[100]['pred_tensor'].to(device) * 2 - 1, gt_gpu * 2 - 1).item())
                 
                 progress[task_key]["seeds"][seed_key] = {
                     "10": {
                         "psnr": float(metrics[10]['psnr']),
                         "ssim": float(metrics[10]['ssim']),
-                        "lpips": float(lpips_10)
+                        "lpips": lpips_10
                     },
                     "100": {
                         "psnr": float(metrics[100]['psnr']),
                         "ssim": float(metrics[100]['ssim']),
-                        "lpips": float(lpips_100)
+                        "lpips": lpips_100
                     }
                 }
                 
                 print(f"  Seed {seed:<5} | 10 steps: PSNR {metrics[10]['psnr']:.2f} dB, LPIPS {lpips_10:.4f} | 100 steps: PSNR {metrics[100]['psnr']:.2f} dB, LPIPS {lpips_100:.4f} | Time: {time.time()-start_t:.1f}s")
             except Exception as e:
                 print(f"  Error on Task {idx+1} Seed {seed}: {e}")
-                # We do not crash so we can continue or retry
                 continue
 
         # Save progress after each task
         with open(temp_json_path, 'w') as f:
             json.dump(progress, f, indent=2)
-
-    # Compute aggregate statistics
-    # We want mean and variance (std) across seeds, averaged over all completed tasks.
-    # So for each seed, we first compute the average metric over all tasks.
-    # Then we compute the mean and std across the 5 seeds.
-    #
-    # Wait, let's also compute the mean/std per task across seeds and average them.
-    # But usually, "variance of performance on 5 seeds" means we find the performance of the model on the benchmark set for each seed, and look at the variance of that overall benchmark score.
-    # Let's compute both:
-    # 1. Overall benchmark score per seed (average metric over all tasks), then mean & std of these 5 overall scores.
-    # 2. Mean and std per task across seeds, then average these across tasks.
-    # We will present both to be extremely comprehensive!
 
     completed_task_keys = [k for k, v in progress.items() if len(v["seeds"]) == len(seeds)]
     if not completed_task_keys:
@@ -305,7 +280,6 @@ def main(args):
         } for step in ["10", "100"]
     }
 
-    # Format output text and table
     lines = []
     lines.append("==========================================================================")
     lines.append("                  METADC-INR TTO VARIANCE ANALYSIS")
@@ -313,7 +287,6 @@ def main(args):
     lines.append(f"Evaluated on {len(completed_task_keys)} benchmark tasks across 5 seeds: {seeds}")
     lines.append("==========================================================================\n")
 
-    # Table 1: Overall Benchmark Performance Per Seed
     lines.append("### 1. Overall Performance Per Seed")
     lines.append(f"| Seed | 10-step PSNR | 10-step SSIM | 10-step LPIPS | 100-step PSNR | 100-step SSIM | 100-step LPIPS |")
     lines.append(f"| :--- | :---: | :---: | :---: | :---: | :---: | :---: |")
@@ -327,7 +300,6 @@ def main(args):
         lines.append(f"| {seed} | {p10:.4f} | {s10:.4f} | {l10:.4f} | {p100:.4f} | {s100:.4f} | {l100:.4f} |")
     lines.append("")
 
-    # Table 2: Summary Stats (Mean ± Std, Min, Max)
     lines.append("### 2. Summary Statistics (Across 5 Seeds)")
     lines.append(f"| Metric | 10-step adapt | 100-step adapt |")
     lines.append(f"| :--- | :---: | :---: |")
@@ -345,11 +317,9 @@ def main(args):
     report_content = "\n".join(lines)
     print("\n" + report_content + "\n")
 
-    # Write report to file
     with open(final_txt_path, 'w') as f:
         f.write(report_content)
 
-    # Save final JSON results
     with open(final_json_path, 'w') as f:
         json.dump({
             "overall_per_seed": overall_per_seed,
