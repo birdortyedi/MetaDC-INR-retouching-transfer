@@ -1,0 +1,13 @@
+numpy==2.5.0
+pandas==3.0.3
+Pillow==12.2.0
+matplotlib==3.11.0
+scipy==1.18.0
+scikit-image
+thop==0.1.1.post2209072238
+torch>=2.0.0
+torchvision>=0.15.0
+kornia==0.8.2
+lpips==0.1.4
+tqdm==4.67.1
+PyYAML==6.0.3
