@@ -19,3 +19,10 @@ results/results_dual*
 results/meta_vis
 weights/meta_model_ft_*
 *.zip
+# Local checkpoints (ablation variants, intermediate saves) stay on disk but are not tracked.
+# Only the released meta-trained model is part of the repository.
+weights/*
+*.pth
+!weights/meta_model_ft.pth
+*_progress.txt
+meta_vis/

@@ -8,25 +8,13 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from PIL import Image
-from skimage.metrics import structural_similarity as ssim_metric
 from torchvision import transforms
 from tqdm import tqdm
 
 from dataset import RetouchEvaluationDataset
 from model import InRetouchNR, get_subpixel_sampling_windows
-
-
-def calculate_psnr(img1, img2):
-    mse = torch.mean((img1 - img2) ** 2)
-    if mse == 0:
-        return 100
-    return 20 * math.log10(1.0 / math.sqrt(mse))
-
-
-def calculate_ssim(img1, img2):
-    img1_np = img1.squeeze(0).permute(1, 2, 0).cpu().numpy()
-    img2_np = img2.squeeze(0).permute(1, 2, 0).cpu().numpy()
-    return ssim_metric(img1_np, img2_np, data_range=1.0, channel_axis=2)
+from utils.metrics import calculate_psnr, calculate_ssim
+from utils.losses import CharbonnierLoss
 
 
 def main(args):
@@ -87,7 +75,7 @@ def main(args):
                 param.requires_grad = False
                 
             optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
-            criterion = nn.SmoothL1Loss(beta=0.01)
+            criterion = CharbonnierLoss(beta=0.01)
             
             scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.steps, eta_min=1e-4)
             

@@ -12,7 +12,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from PIL import Image
-from skimage.metrics import structural_similarity as ssim_metric
 from torchvision import transforms
 from tqdm import tqdm
 import kornia
@@ -20,19 +19,8 @@ import lpips
 
 from dataset import RetouchEvaluationDataset
 from model import InRetouchNR, get_subpixel_sampling_windows
-
-
-def calculate_psnr(img1, img2):
-    mse = torch.mean((img1 - img2) ** 2).item()
-    if mse == 0:
-        return 100.0
-    return 20 * math.log10(1.0 / math.sqrt(mse))
-
-
-def calculate_ssim(img1, img2):
-    img1_np = img1.squeeze(0).permute(1, 2, 0).cpu().numpy()
-    img2_np = img2.squeeze(0).permute(1, 2, 0).cpu().numpy()
-    return float(ssim_metric(img1_np, img2_np, data_range=1.0, channel_axis=2))
+from utils.metrics import calculate_psnr, calculate_ssim
+from utils.losses import CharbonnierLoss
 
 
 def run_tto_task(task, model_path, device, seed, batch_size=484, window_size=13, lr=1e-3):
@@ -72,7 +60,7 @@ def run_tto_task(task, model_path, device, seed, batch_size=484, window_size=13,
         param.requires_grad = False
 
     optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=lr)
-    criterion = nn.SmoothL1Loss(beta=0.01)
+    criterion = CharbonnierLoss(beta=0.01)
 
     # 100 steps total
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100, eta_min=1e-4)
@@ -324,7 +312,7 @@ def main(args):
         json.dump({
             "overall_per_seed": overall_per_seed,
             "raw_progress": progress
-        }, f, indent=2)
+        }, f, indent=2, default=lambda o: float(o) if isinstance(o, (np.floating, np.integer)) else o)
 
     print(f"Results saved to:\n  - {final_txt_path}\n  - {final_json_path}")
 

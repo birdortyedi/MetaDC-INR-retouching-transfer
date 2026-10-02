@@ -11,25 +11,17 @@ from torchvision import transforms
 from tqdm import tqdm
 import thop
 import lpips
-from skimage.metrics import structural_similarity as ssim_metric
 from model import InRetouchNR
-
-def calculate_psnr(img1, img2):
-    mse = torch.mean((img1 - img2) ** 2)
-    if mse == 0:
-        return 100.0
-    return 20 * torch.log10(1.0 / torch.sqrt(mse)).item()
-
-def calculate_ssim(img1, img2):
-    img1_np = img1.squeeze(0).permute(1, 2, 0).detach().cpu().numpy()
-    img2_np = img2.squeeze(0).permute(1, 2, 0).cpu().numpy()
-    return ssim_metric(img1_np, img2_np, data_range=1.0, channel_axis=2)
+from model_ablate import InRetouchNRAblate
+from utils.metrics import calculate_psnr, calculate_ssim
+from utils.losses import CharbonnierLoss
 
 import kornia
 from model import get_subpixel_sampling_windows
 
-def run_tto(model_path, target_natural, ref_natural, ref_retouched, device, steps=500, batch_size=512, window_size=13, hidden_dim=128):
-    model = InRetouchNR(hidden_dim=hidden_dim).to(device)
+def run_tto(model_path, target_natural, ref_natural, ref_retouched, device, steps=500, batch_size=512, window_size=13, hidden_dim=128, ablate=None):
+    model = (InRetouchNR(hidden_dim=hidden_dim) if ablate is None
+             else InRetouchNRAblate(hidden_dim=hidden_dim, ablate=ablate)).to(device)
     if os.path.exists(model_path):
         model.load_state_dict(torch.load(model_path, map_location=device))
     
@@ -43,7 +35,7 @@ def run_tto(model_path, target_natural, ref_natural, ref_retouched, device, step
     cntx_size = window_size + 28
     
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-    criterion = torch.nn.SmoothL1Loss(beta=0.01)
+    criterion = CharbonnierLoss(beta=0.01)
     
     # TTO Loop
     torch.cuda.synchronize()
@@ -62,7 +54,10 @@ def run_tto(model_path, target_natural, ref_natural, ref_retouched, device, step
         x_c = torch.rand(batch_size, device=device) * (2.0 - 2*half_cntx_w) - (1.0 - half_cntx_w)
         centers = torch.stack([x_c, y_c], dim=-1)
 
-        p_large_sharp, _, _, _, _ = get_subpixel_sampling_windows(r_nat, batch_size=batch_size, window_size=cntx_size, centers=centers)
+        if ablate == 'single_scale':
+            p_large_sharp = None
+        else:
+            p_large_sharp, _, _, _, _ = get_subpixel_sampling_windows(r_nat, batch_size=batch_size, window_size=cntx_size, centers=centers)
         _, p_smooth_13, _, _, _ = get_subpixel_sampling_windows(r_nat, batch_size=batch_size, window_size=window_size, centers=centers)
         _, p_target_smooth, offsets_target, abs_coords_target, _ = get_subpixel_sampling_windows(r_ret, batch_size=batch_size, window_size=window_size, centers=centers)
         
@@ -120,7 +115,7 @@ def main(args):
     if args.num_presets > 0:
         presets = presets[:args.num_presets]
         
-    steps_to_test = [10, 100, 500]
+    steps_to_test = [int(x) for x in str(args.steps_list).split(',')]
     results_summary = []
 
     print(f"\nStarting Comparative TTO Benchmark ({len(pairs)} pairs x {len(presets)} presets)")
@@ -145,7 +140,7 @@ def main(args):
                     
                 output, t_time = run_tto(args.meta_weights, t_nat_path, r_nat_path, r_ret_path, device, 
                                          steps=steps, batch_size=args.batch_size, window_size=args.window_size,
-                                         hidden_dim=args.hidden_dim)
+                                         hidden_dim=args.hidden_dim, ablate=args.ablate)
                 
                 gt = transforms.ToTensor()(Image.open(gt_path).convert('RGB')).unsqueeze(0).to(device)
                 if output.shape != gt.shape:
@@ -197,6 +192,7 @@ if __name__ == '__main__':
     parser.add_argument('--dataset_path', type=str, required=True)
     parser.add_argument('--meta_weights', type=str, default='weights/meta_model_ft.pth')
     parser.add_argument('--steps', type=int, default=500)
+    parser.add_argument('--steps_list', type=str, default='10,100,500')
     parser.add_argument('--gpu', type=int, default=0)
     parser.add_argument('--num_samples', type=int, default=0)
     parser.add_argument('--num_presets', type=int, default=0)
@@ -204,5 +200,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=512)
     parser.add_argument('--window_size', type=int, default=13)
     parser.add_argument('--hidden_dim', type=int, default=128)
+    parser.add_argument('--ablate', type=str, default=None,
+                        choices=['no_global', 'no_local', 'naive_coords', 'single_scale', 'concat_cond'])
     args = parser.parse_args()
     main(args)

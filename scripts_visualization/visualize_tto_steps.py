@@ -13,6 +13,7 @@ import kornia
 
 from dataset import CompetitionDataset
 from model import InRetouchNR, get_subpixel_sampling_windows
+from utils.losses import CharbonnierLoss
 
 import lpips
 
@@ -38,7 +39,7 @@ def compute_metrics(pred_uint8, gt_uint8, lpips_model, device):
 def run_tto_visualize(ref_in_tensor, ref_out_tensor, model, device, args, target_steps):
     Hr, Wr = ref_in_tensor.shape[2:]
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    criterion = nn.SmoothL1Loss(beta=0.01)
+    criterion = CharbonnierLoss(beta=0.01)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.steps, eta_min=1e-4)
     
     cntx_pad = 14

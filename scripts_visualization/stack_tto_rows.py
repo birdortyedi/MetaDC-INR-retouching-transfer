@@ -30,10 +30,15 @@ def stack_images(input_paths, output_path, gap=5):
     print(f"Combined image saved to {output_path}")
 
 if __name__ == '__main__':
-    base_dir = '/home/birdortyedi/inr-retouching/tto_visuals_final_font'
+    import argparse
+    ap = argparse.ArgumentParser(description="Stack per-sample TTO progress rows into one figure.")
+    ap.add_argument("--input_dir", required=True, help="folder with <sample>_tto_progress.png")
+    ap.add_argument("--output_dir", default="tto_visuals_combined")
+    a = ap.parse_args()
+    base_dir = a.input_dir
     samples = ['sample166', 'sample146', 'sample125', 'sample149']
     paths = [os.path.join(base_dir, f"{s}_tto_progress.png") for s in samples]
     
-    output_dir = '/home/birdortyedi/inr-retouching/tto_visuals_combined'
+    output_dir = a.output_dir
     os.makedirs(output_dir, exist_ok=True)
     stack_images(paths, os.path.join(output_dir, 'tto_progress_stacked.png'))

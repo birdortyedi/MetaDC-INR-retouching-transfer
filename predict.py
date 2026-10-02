@@ -11,6 +11,7 @@ from tqdm import tqdm
 
 from dataset import CompetitionDataset
 from model import InRetouchNR, get_subpixel_sampling_windows
+from utils.losses import CharbonnierLoss
 
 
 def main(args):
@@ -54,7 +55,7 @@ def main(args):
 
             model.to(device)
             optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-            criterion = nn.SmoothL1Loss(beta=0.01)
+            criterion = CharbonnierLoss(beta=0.01)
             
             scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.steps, eta_min=1e-4)
             

@@ -16,16 +16,14 @@ import pandas as pd
 
 from dataset import CompetitionDataset
 from model import InRetouchNR, get_subpixel_sampling_windows
+from utils.metrics import calculate_psnr
+from utils.losses import CharbonnierLoss
 
-def calculate_psnr(img1, img2):
-    mse = torch.mean((img1 - img2) ** 2).item()
-    if mse < 1e-10: return 50.0
-    return 10 * math.log10(1.0 / mse)
 
 def run_tto_metrics(ref_in_tensor, ref_out_tensor, model, device, args, target_steps):
     Hr, Wr = ref_in_tensor.shape[2:]
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    criterion = nn.SmoothL1Loss(beta=0.01)
+    criterion = CharbonnierLoss(beta=0.01)
     
     cntx_pad = 14
     cntx_size = args.window_size + 2 * cntx_pad

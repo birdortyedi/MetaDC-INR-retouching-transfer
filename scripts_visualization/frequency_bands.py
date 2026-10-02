@@ -25,6 +25,7 @@ from torchvision import transforms
 
 from dataset import CompetitionDataset
 from model import InRetouchNR, get_subpixel_sampling_windows
+from utils.losses import CharbonnierLoss
 
 
 def forward_decomposed(model, x):
@@ -90,7 +91,7 @@ def forward_decomposed(model, x):
 def run_tto(ref_in_tensor, ref_out_tensor, model, device, args):
     Hr, Wr = ref_in_tensor.shape[2:]
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    criterion = nn.SmoothL1Loss(beta=0.01)
+    criterion = CharbonnierLoss(beta=0.01)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.steps, eta_min=1e-4)
     cntx_pad = 14
     cntx_size = args.window_size + 2 * cntx_pad

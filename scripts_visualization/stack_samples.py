@@ -1,9 +1,12 @@
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import os
+import argparse
 from PIL import Image
 
-output_dir = "/home/birdortyedi/inr-retouching/FINAL_VISUALIZATIONS_OVERLAY"
+_ap = argparse.ArgumentParser(description="Stack the comparison rows of create_final_comparison.py into the appendix figures.")
+_ap.add_argument("--output_dir", default="FINAL_VISUALIZATIONS_OVERLAY", help="folder with overlay_row_<sample>.jpg; stacks are written here")
+output_dir = _ap.parse_args().output_dir
 
 # Previous samples:
 # samples = ["sample105", "sample177", "sample163", "sample179"]

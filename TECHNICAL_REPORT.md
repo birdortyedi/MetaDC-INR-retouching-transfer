@@ -50,7 +50,7 @@ The test-time adaptation is governed by a weighted composite objective:
 
 $$\mathcal{L} = \mathcal{L}_{\text{Charb}} + \lambda_{S}\mathcal{L}_{\text{SSIM}} + \lambda_{L}\mathcal{L}_{\text{Lab}} + \lambda_{T}\mathcal{L}_{\text{TV}}$$
 
-*   **Charbonnier Loss** ($\mathcal{L}_{\text{Charb}}$): Smooth L1 with $\beta = 0.01$ for stable gradients near zero error.
+*   **Charbonnier Loss** ($\mathcal{L}_{\text{Charb}}$): $\sqrt{(\hat{y}-y)^2+\beta^2}$ with $\beta = 0.01$, a differentiable variant of L1 with stable gradients near zero error.
 *   **SSIM Loss** ($\mathcal{L}_{\text{SSIM}}$, $\lambda_S = 0.2$): Enforces perceptual and structural fidelity.
 *   **Lab-Color Loss** ($\mathcal{L}_{\text{Lab}}$, $\lambda_L = 0.05$): Minimizes Euclidean distance in Lab color space for perceptual accuracy.
 *   **Total Variation Loss** ($\mathcal{L}_{\text{TV}}$, $\lambda_T = 0.001$): Promotes local smoothness to suppress latent grid noise.

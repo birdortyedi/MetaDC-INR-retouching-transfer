@@ -1,14 +1,22 @@
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import os
+import argparse
 from PIL import Image, ImageDraw, ImageFont
 
 # Configuration
-DATA_DIR = "/home/birdortyedi/inr-retouching/data/Subjective_Evaluation_Data"
-M1_DIR = "/home/birdortyedi/inr-retouching/QUALITATIVE_RESULTS/M1"
-M2_DIR = "/home/birdortyedi/inr-retouching/QUALITATIVE_RESULTS/M2"
-OURS_DIR = "/home/birdortyedi/inr-retouching/results/subj_eval_results_500"
-OUTPUT_DIR = "/home/birdortyedi/inr-retouching/FINAL_VISUALIZATIONS_OVERLAY"
+_ap = argparse.ArgumentParser(description="Per-sample comparison rows: references, input, M1, M2 and MetaDC-INR outputs.")
+_ap.add_argument("--data_dir", required=True, help="Subjective_Evaluation_Data root (sampleX/ subfolders)")
+_ap.add_argument("--m1_dir", default="QUALITATIVE_RESULTS/M1", help="outputs of the first comparison method")
+_ap.add_argument("--m2_dir", default="QUALITATIVE_RESULTS/M2", help="outputs of the second comparison method")
+_ap.add_argument("--ours_dir", default="results/subj_eval_results_500", help="MetaDC-INR outputs (sampleX_retouched.png)")
+_ap.add_argument("--output_dir", default="FINAL_VISUALIZATIONS_OVERLAY")
+_args = _ap.parse_args()
+DATA_DIR = _args.data_dir
+M1_DIR = _args.m1_dir
+M2_DIR = _args.m2_dir
+OURS_DIR = _args.ours_dir
+OUTPUT_DIR = _args.output_dir
 
 # Get all samples automatically
 SAMPLES = sorted([d for d in os.listdir(DATA_DIR) if os.path.isdir(os.path.join(DATA_DIR, d))])

@@ -1,6 +1,6 @@
 # MetaDC-INR Ablation and Benchmarking Scripts Specification
 
-This document specifies the official ablation and benchmarking scripts for **MetaDC-INR** (excluding Lie-algebra based variants). These scripts evaluate the model's core components: the meta-learned prior, baseline comparisons, TTO strategies, and robustness to sampling randomness.
+This document specifies the official ablation and benchmarking scripts for **MetaDC-INR**. These scripts evaluate the model's core components: the meta-learned prior, baseline comparisons, TTO strategies, and robustness to sampling randomness.
 
 ---
 
@@ -11,7 +11,7 @@ This document specifies the official ablation and benchmarking scripts for **Met
 - **Execution Command**:
   ```bash
   python scripts_benchmarking/profile_convergence.py \
-      --dataset_path /home/birdortyedi/PycharmProjects/shadow-aware-l0-smoothing/datasets/Retouch_Transfer_Dataset \
+      --dataset_path <RTD> \
       --meta_weights weights/meta_model_ft.pth \
       --num_samples 5 \
       --steps 200 \
@@ -33,7 +33,7 @@ This ablation compares MetaDC-INR's Reptile-based initialization against models 
 - **Execution Command**:
   ```bash
   python scripts_training/train_baseline.py \
-      --dataset_path /home/birdortyedi/PycharmProjects/shadow-aware-l0-smoothing/datasets/Retouch_Transfer_Dataset \
+      --dataset_path <RTD> \
       --optimizer adamw \
       --epochs 5 \
       --gpu 0
@@ -46,7 +46,7 @@ This ablation compares MetaDC-INR's Reptile-based initialization against models 
 - **Execution Command**:
   ```bash
   python scripts_benchmarking/ablation_meta_vs_baselines.py \
-      --dataset_path /home/birdortyedi/PycharmProjects/shadow-aware-l0-smoothing/datasets/Retouch_Transfer_Dataset \
+      --dataset_path <RTD> \
       --meta_weights weights/meta_model_ft.pth \
       --num_samples 10 \
       --gpu 0
@@ -67,7 +67,7 @@ This ablation compares MetaDC-INR's Reptile-based initialization against models 
 - **Execution Command**:
   ```bash
   python scripts_analysis/selective_tto_analysis.py \
-      --dataset_path /home/birdortyedi/PycharmProjects/shadow-aware-l0-smoothing/datasets/Retouch_Transfer_Dataset \
+      --dataset_path <RTD> \
       --meta_weights weights/meta_model_ft.pth \
       --steps 20 \
       --num_samples 5 \
@@ -84,7 +84,7 @@ This ablation compares MetaDC-INR's Reptile-based initialization against models 
 - **Execution Command**:
   ```bash
   python scripts_benchmarking/measure_variance.py \
-      --dataset_path /home/birdortyedi/PycharmProjects/shadow-aware-l0-smoothing/datasets/Retouch_Transfer_Dataset \
+      --dataset_path <RTD> \
       --meta_weights weights/meta_model_ft.pth \
       --gpu 0
   ```
@@ -102,8 +102,31 @@ This ablation compares MetaDC-INR's Reptile-based initialization against models 
 - **Execution Command**:
   ```bash
   python scripts_visualization/visualize_decomposition.py \
-      --dataset_path /home/birdortyedi/PycharmProjects/shadow-aware-l0-smoothing/datasets/Retouch_Transfer_Dataset \
+      --dataset_path <RTD> \
       --meta_weights weights/meta_model_ft.pth \
       --gpu 0
   ```
 - **Outputs**: Saves decomposition visual strips (Original, Matrix component, Detail component, Fused result) to `visualization_outputs/`.
+
+---
+
+## 6. Component Ablation (Table 3)
+
+- **Script Path**: `scripts_benchmarking/run_component_ablation.sh`, with the variants defined in `model_ablate.py`
+- **Description**: Removes or replaces one architectural component at a time, meta-trains the variant with `meta_train.py --ablate <variant>` under the same protocol as the full model, and evaluates it with `benchmark.py` at 100 TTO steps (batch 512, all 1,342 RTD benchmark tasks). Where removing a component would leave the network without an input, it is replaced by its simplest alternative.
+
+| `--ablate` | Variant (Table 3) | Change |
+|:---|:---|:---|
+| `no_global` | w/o global branch | FiLM is conditioned on the local context only |
+| `no_local` | w/o local branch | FiLM is conditioned on the broadcast global descriptor only |
+| `naive_coords` | Raw coordinates | raw (dx, dy, x, y, R, G, B) replaces the 107-dimensional encoding |
+| `single_scale` | Single-scale patch | one 13 × 13 patch feeds both context paths |
+| `concat_cond` | FiLM → concat. | the context is concatenated to the MLP input instead of modulating it |
+
+With `ablate=None`, `InRetouchNRAblate` is identical to `model.InRetouchNR`: `weights/meta_model_ft.pth` loads with `strict=True` and the outputs match bit for bit.
+
+- **Command**:
+  ```bash
+  bash scripts_benchmarking/run_component_ablation.sh <RTD> no_local 0
+  ```
+- **Outputs**: `weights/meta_ablate_<variant>.pth` (git-ignored) and `results/ablation/<variant>/FINAL_BENCHMARK_RESULTS_multiscale.txt`.

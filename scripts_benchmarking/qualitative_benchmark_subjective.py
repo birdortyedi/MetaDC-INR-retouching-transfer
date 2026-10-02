@@ -5,13 +5,21 @@ import subprocess
 import yaml
 import shutil
 import time
+import argparse
 
 # Configuration
-DATA_DIR = "/home/birdortyedi/inr-retouching/data/Subjective_Evaluation_Data"
-METHOD1_DIR = "/home/birdortyedi/PycharmProjects/InRetouch"
-METHOD2_DIR = "/home/birdortyedi/Downloads/InRetouch_backup/InRetouch"
-RESULTS_DIR = "/home/birdortyedi/inr-retouching/QUALITATIVE_RESULTS"
-CONDA_ENV = "mauve"
+_ap = argparse.ArgumentParser(description="Qualitative comparison: fit two INRetouch-based code bases (M1, M2) on each subjective-evaluation sample.")
+_ap.add_argument("--data_dir", required=True, help="Subjective_Evaluation_Data root (sampleX/ subfolders)")
+_ap.add_argument("--method1_dir", required=True, help="checkout of the first comparison method (M1)")
+_ap.add_argument("--method2_dir", required=True, help="checkout of the second comparison method (M2)")
+_ap.add_argument("--results_dir", default="QUALITATIVE_RESULTS", help="output root; M1/ and M2/ are created inside")
+_ap.add_argument("--conda_env", required=True, help="conda environment in which the comparison methods run")
+_args = _ap.parse_args()
+DATA_DIR = _args.data_dir
+METHOD1_DIR = _args.method1_dir
+METHOD2_DIR = _args.method2_dir
+RESULTS_DIR = _args.results_dir
+CONDA_ENV = _args.conda_env
 
 # Get all samples automatically
 SAMPLES = sorted([d for d in os.listdir(DATA_DIR) if os.path.isdir(os.path.join(DATA_DIR, d))])

@@ -31,33 +31,12 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from PIL import Image
-from skimage.metrics import structural_similarity as ssim_metric
 from torchvision import transforms
 
 from dataset import CompetitionDataset
 from model import InRetouchNR, get_subpixel_sampling_windows
-
-
-def calculate_psnr(img1, img2):
-    mse = torch.mean((img1 - img2) ** 2).item()
-    if mse < 1e-10:
-        return 50.0
-    return 10 * math.log10(1.0 / mse)
-
-
-def calculate_ssim_image(img1, img2):
-    """Full-image SSIM using skimage (matches main.py evaluation)."""
-    img1_np = img1.squeeze(0).permute(1, 2, 0).cpu().numpy()
-    img2_np = img2.squeeze(0).permute(1, 2, 0).cpu().numpy()
-    return ssim_metric(img1_np, img2_np, data_range=1.0, channel_axis=2)
-
-
-def calculate_delta_e(pred, target):
-    """Mean CIE ΔE (L*a*b*) between predicted and target."""
-    pred_lab = kornia.color.rgb_to_lab(pred)
-    target_lab = kornia.color.rgb_to_lab(target)
-    de = torch.sqrt(torch.sum((pred_lab - target_lab) ** 2, dim=1) + 1e-8)
-    return de.mean().item()
+from utils.metrics import calculate_psnr, calculate_ssim, calculate_delta_e
+from utils.losses import CharbonnierLoss
 
 
 def run_tto_with_checkpoints(
@@ -76,7 +55,7 @@ def run_tto_with_checkpoints(
     Hr, Wr = ref_in_tensor.shape[2:]
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    criterion = nn.SmoothL1Loss(beta=0.01)
+    criterion = CharbonnierLoss(beta=0.01)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.steps, eta_min=1e-4)
 
     cntx_pad = 14
@@ -100,7 +79,7 @@ def run_tto_with_checkpoints(
             with torch.no_grad():
                 pred_full = model(ref_in_tensor).clamp(0, 1)
                 img_psnr = calculate_psnr(pred_full, ref_out_tensor)
-                img_ssim = calculate_ssim_image(pred_full, ref_out_tensor)
+                img_ssim = calculate_ssim(pred_full, ref_out_tensor)
                 img_de = calculate_delta_e(pred_full, ref_out_tensor)
             image_metrics['step'].append(step)
             image_metrics['psnr'].append(img_psnr)
@@ -172,7 +151,7 @@ def run_tto_with_checkpoints(
         with torch.no_grad():
             pred_full = model(ref_in_tensor).clamp(0, 1)
             img_psnr = calculate_psnr(pred_full, ref_out_tensor)
-            img_ssim = calculate_ssim_image(pred_full, ref_out_tensor)
+            img_ssim = calculate_ssim(pred_full, ref_out_tensor)
             img_de = calculate_delta_e(pred_full, ref_out_tensor)
         image_metrics['step'].append(args.steps - 1)
         image_metrics['psnr'].append(img_psnr)

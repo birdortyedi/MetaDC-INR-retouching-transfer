@@ -1,6 +1,7 @@
 import argparse
 import copy
 import os
+import time
 
 import kornia
 import torch
@@ -12,6 +13,8 @@ from tqdm import tqdm
 
 from dataset import RetouchDataset
 from model import InRetouchNR, get_subpixel_sampling_windows
+from model_ablate import InRetouchNRAblate
+from utils.losses import CharbonnierLoss
 
 
 def main(args):
@@ -21,10 +24,19 @@ def main(args):
     dataset = RetouchDataset(args.dataset_path)
     print(f"Dataset initialized with {len(dataset)} total tasks.")
     
-    meta_model = InRetouchNR(hidden_dim=128).to(device)
+    meta_model = (InRetouchNR(hidden_dim=128) if args.ablate is None
+                  else InRetouchNRAblate(hidden_dim=128, ablate=args.ablate)).to(device)
+
+    _pfx = args.out_prefix
+    _latest_path = "meta_model_ft_latest.pth" if _pfx is None else f"{_pfx}_latest.pth"
+    _final_path = "meta_model_ft.pth" if _pfx is None else f"{_pfx}_final.pth"
+    _progress_path = ("meta_model_ft" if _pfx is None else _pfx) + "_progress.txt"
+    if args.resume_from:
+        meta_model.load_state_dict(torch.load(args.resume_from, map_location=device))
+        print(f"Resumed weights from {args.resume_from}, skipping to task {args.resume_at}")
     
     to_tensor = transforms.ToTensor()
-    l1_criterion = nn.SmoothL1Loss(beta=0.01)
+    l1_criterion = CharbonnierLoss(beta=0.01)
     
     # Meta-training hyperparameters
     meta_lr = args.meta_lr  # epsilon in Reptile
@@ -37,10 +49,16 @@ def main(args):
         print(f"\nMeta-Epoch {epoch+1}/{args.epochs}")
         
         # Shuffle tasks
-        indices = torch.randperm(len(dataset))
+        if args.task_seed is not None:
+            _g = torch.Generator().manual_seed(args.task_seed + epoch)
+            indices = torch.randperm(len(dataset), generator=_g)
+        else:
+            indices = torch.randperm(len(dataset))
         
         pbar = tqdm(range(len(dataset)))
         for i in pbar:
+            if i < args.resume_at:
+                continue
             task = dataset[indices[i]]
             
             input_img = Image.open(task['input_path']).convert('RGB')
@@ -103,7 +121,10 @@ def main(args):
                 centers = torch.stack([x_c, y_c], dim=-1)
 
                 # Subpixel Samples
-                patches_in_large_sharp, _, _, _, _ = get_subpixel_sampling_windows(input_tensor, batch_size=args.batch_size, window_size=cntx_size, centers=centers)
+                if args.ablate == 'single_scale':
+                    patches_in_large_sharp = None
+                else:
+                    patches_in_large_sharp, _, _, _, _ = get_subpixel_sampling_windows(input_tensor, batch_size=args.batch_size, window_size=cntx_size, centers=centers)
                 _, patches_in_smooth_13, _, _, _ = get_subpixel_sampling_windows(input_tensor, batch_size=args.batch_size, window_size=ws, centers=centers)
                 
                 # Target: smooth patches (13x13)
@@ -157,10 +178,15 @@ def main(args):
             
             # Save periodic checkpoints
             if (i + 1) % args.save_freq == 0:
-                torch.save(meta_model.state_dict(), f"meta_model_ft_latest.pth")
+                torch.save(meta_model.state_dict(), _latest_path)
+                with open(_progress_path, "w") as _fh:
+                    _fh.write(f"{i + 1}\n")
                 
-    torch.save(meta_model.state_dict(), "meta_model_ft.pth")
-    print("Meta-training complete. Saved to meta_model_ft.pth")
+    if os.path.exists(_final_path) and not args.overwrite:
+        _final_path = f"{os.path.splitext(_final_path)[0]}_{int(time.time())}.pth"
+        print(f"WARNING: target exists; writing {_final_path} instead (pass --overwrite to replace)")
+    torch.save(meta_model.state_dict(), _final_path)
+    print(f"Meta-training complete. Saved to {_final_path}")
 
 
 if __name__ == '__main__':
@@ -175,5 +201,12 @@ if __name__ == '__main__':
     parser.add_argument('--gpu', type=int, default=0)
     parser.add_argument('--save_freq', type=int, default=100)
     parser.add_argument('--vis_freq', type=int, default=4000)
+    parser.add_argument('--ablate', type=str, default=None,
+                        choices=['no_global', 'no_local', 'naive_coords', 'single_scale', 'concat_cond'])
+    parser.add_argument('--resume_from', type=str, default=None)
+    parser.add_argument('--resume_at', type=int, default=0)
+    parser.add_argument('--task_seed', type=int, default=None)
+    parser.add_argument('--out_prefix', type=str, default=None)
+    parser.add_argument('--overwrite', action='store_true')
     args = parser.parse_args()
     main(args)
